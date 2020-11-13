@@ -1,7 +1,6 @@
 int testMode = 1;
 
 const int MAIN_SPEED = 30;
-//Xan's test
 
 //Defines motor pin locations
 int leftMotorPin = 2;
@@ -56,25 +55,19 @@ void setup() {
   SetUpBumpers();
   arm.setSpeed(200); //in RPM
   SetUpDistanceSensor();
-  //SetUpLine();
+  SetUpLine();
 }
 
 void loop() {
   
-  static int count = 0;
   static int tempData = 0;
   static bool gotBall = false;
   
-  //tempData = ReadLine();
-  //Serial.println(tempData);
-  //RespondToBlack2(tempData);
-  //delay(1000);
-  //RespondToLine(tempData, count);
-  if(count == 5){
-    count = 0;
-  }
-  //RespondToBump();
-  //count = CountLineData(tempData, ReadLine(), count); 
+  tempData = ReadLine();
+  Serial.println(tempData);
+  RespondToBlack2(tempData);
+
+  RespondToBump();
   
   if(CheckBall() && !gotBall){
     PickUpBall();
