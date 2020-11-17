@@ -42,6 +42,7 @@ void SetUpDistanceSensor();
 //Everything for the ultrasonic sensor
 #include "SR04.h"
 SR04 sr04 = SR04(35,34);
+SR04 bottom = SR04(32,33); 
 
 
 void setup() {
@@ -51,25 +52,30 @@ void setup() {
   SetUpWheels();
   SetUpBumpers();
   arm.setSpeed(200); //in RPM
-  SetUpDistanceSensor();
+  //SetUpDistanceSensor();
   SetUpLine();
 }
 
-void loop() {
-  
+void loop() { 
   static int tempData = 0;
   static bool gotBall = false;
+  static int topVal = 0;
+  static int bottomVal = 0;
 
+  topVal = ReadTop();
+  bottomVal = ReadBottom();
   
   tempData = ReadLine();
   Serial.println(tempData);
   RespondToBlack(tempData);
 
-  //RespondToBump();
+  RespondToBump();
   
-  if(CheckBall() && !gotBall){
+  if(CheckBall(bottomVal, topVal) && !gotBall){
+    GoBackwards();
+    delay(400);
     PickUpBall();
-    delay(5000);
+    delay(1000);
     gotBall = true;
     TurnAround();
   } 
@@ -137,10 +143,10 @@ void CornerTurn(int pin){
   delay(400);
   WheelControl(rightMotorPin, MAIN_SPEED, 1); //Backs up the robot before making a turn
   WheelControl(leftMotorPin, MAIN_SPEED, 1);
-  delay(250); //Determines how long the robot backs up for
+  delay(315); //Determines how long the robot backs up for
   Stop(); //Stop the robot and delay to avoid changing direction too quickly
   delay(400);
-  Turn(pin, 525, MAIN_SPEED); //Determines how long and fast the robot turns on a corner, 2nd number needs to be changed depending on the speed
+  Turn(pin, 560, MAIN_SPEED); //Determines how long and fast the robot turns on a corner, 2nd number needs to be changed depending on the speed
   GoForward();
   delay(200); //Don't read data right after turning, go forward first for 200 ms
 }
@@ -169,7 +175,7 @@ void TurnAround(){
   Stop();
   WheelControl(leftMotorPin, MAIN_SPEED);
   WheelControl(rightMotorPin, MAIN_SPEED, 1);
-  delay(650); //FIXME IF MAIN_SPEED IS CHANGED ******************************** Needs to be changed
+  delay(625); //FIXME IF MAIN_SPEED IS CHANGED
   Stop();
 }
 
@@ -179,7 +185,7 @@ void RespondToBlack(int data) {
   else if( data == 7000)
     CornerTurn(rightMotorPin);
   else if (data > 0 && data < 1000)
-    SmoothTurn(leftMotorPin, 25); //Find a value that works with the speed; Adds this amount to MAIN_SPEEd
+    SmoothTurn(leftMotorPin, 22); //Find a value that works with the speed; Adds this amount to MAIN_SPEED
   else if (data > 1000 && data < 2000)
     SmoothTurn(leftMotorPin, 14); //Find a value that works with the speed
   else if (data > 2000 && data < 3000)
@@ -191,7 +197,7 @@ void RespondToBlack(int data) {
   else if(data > 5000 && data < 6000)
     SmoothTurn(rightMotorPin, 14); //Find a value that works with the speed
   else if(data > 6000)
-    SmoothTurn(rightMotorPin, 25); //Find a value that works with the speed
+    SmoothTurn(rightMotorPin, 24); //Find a value that works with the speed
   
 }
 
@@ -211,22 +217,6 @@ void RespondToBlack2(int data) {
   }
   else
     GoForward();
-}
-
-
-int CountLineData(int oldData, int data, int count){
-  if(testMode == 1){
-    Serial.print("Old Data = ");
-    Serial.println(oldData);
-    Serial.print("New Data = ");
-    Serial.println(data);
-  }
-  if(data == oldData){
-    return count + 1;
-  }
-  else{
-    return 0;
-  }
 }
 
 void SetUpBumpers(){
@@ -271,12 +261,12 @@ void RespondToBump(){
   }
   else{
     GoBackwards();
-    delay(500);
+    delay(400);
     if(bump == 1){
-      Turn(rightMotorPin, 2000); //FIXME 575 is just a test number, should turn robot about 45degrees if speed = 50; ******************************
+      Turn(rightMotorPin, 275, MAIN_SPEED + 30); //Needs to be changed in main_speed is changed
     }
     else if (bump == 2){
-      Turn(leftMotorPin, 2000); //FIXME 575 is just a test number, should turn robot about 45degrees if speed = 50; ********************************
+      Turn(leftMotorPin, 300); //Needs to be changed in main_speed is changed
     }
     else{
       TurnAround();
@@ -374,6 +364,39 @@ void SetUpDistanceSensor(){
   sensor.startSample();
 }
 
+int ReadTop(){
+  return sr04.Distance();
+}
+
+int ReadBottom(){
+  return bottom.Distance();
+}
+
+bool CheckBall(int bottomVal, int topVal){
+  bool foundBall = false;
+ 
+  
+  if(testMode == 1){
+      Serial.print("Top ultrasonic sensor value = ");
+      Serial.println(sr04.Distance());
+      Serial.print("Bottom IR single value = ");
+      Serial.println(bottom.Distance());
+    }
+   
+  if( bottomVal > 25 && topVal < 15){
+    foundBall = true;
+    if(testMode == 1){
+      Serial.println("Ball found");
+    }
+  }
+  return foundBall;
+}
+
+
+
+
+/*
+
 bool CheckBall(){
   bool foundBall = false;
 
@@ -401,7 +424,7 @@ bool CheckBall(){
         Serial.println("Ball found, lowering arm");
       }
     }
-    */
+    
     if(testMode == 1){
       Serial.print("Top ultrasonic sensor value = ");
       Serial.println(sr04.Distance());
@@ -418,4 +441,4 @@ bool CheckBall(){
   
    return foundBall;
   }
-}
+}*/
