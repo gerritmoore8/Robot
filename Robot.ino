@@ -1,6 +1,6 @@
-int testMode = 1;
+int testMode = 0;
 //Xan test one
-const int MAIN_SPEED = 150;
+const int MAIN_SPEED = 100;
 
 //Defines motor pin locations
 int leftMotorPin = 2;
@@ -25,9 +25,6 @@ int bmpRight = 51;
 QTRSensors qtr;
 const uint8_t SensorCount = 8;
 uint16_t sensorValues[SensorCount];
-
-//int line[4] = {42, 43, 44, 45, 46,47,48,49};
-
 
 //Everything needed for the stepper motor
 #include <Stepper.h>
@@ -62,18 +59,21 @@ void loop() {
   
   static int tempData = 0;
   static bool gotBall = false;
+
   
   tempData = ReadLine();
   Serial.println(tempData);
   RespondToBlack(tempData);
 
-  RespondToBump();
+  //RespondToBump();
   
   if(CheckBall() && !gotBall){
     PickUpBall();
     delay(5000);
     gotBall = true;
-  }
+    TurnAround();
+  } 
+  
 }
 
 
@@ -88,7 +88,6 @@ void SetUpWheels(){
   pinMode(rightMotorPin, OUTPUT);
   pinMode(leftMotorDir, OUTPUT);
   pinMode(rightMotorDir, OUTPUT);
-  
 }
 
 //Set the wheel to control by the pin it is connected to; Speed must be 0 < and > 255, 0 == off; If dir == 1, motor goes backwards;
@@ -114,37 +113,36 @@ void WheelControl(int pin, int Speed, int dir = 0){
     digitalWrite(dirPin, LOW); //Forward is the default
   }
   analogWrite(pin, 0); //Resets it before making a change
-  //delay(100); //Adds a delay before making changes to wheel speed.
   analogWrite(pin, Speed);
 }
 
 void GoForward(){
   WheelControl(leftMotorPin, MAIN_SPEED);
-  WheelControl(rightMotorPin, MAIN_SPEED);
+  WheelControl(rightMotorPin, MAIN_SPEED); //Extra value is to compensate for weight of motor on right side
 }
 
 void GoBackwards(){
   Stop();
-  int Speed = MAIN_SPEED *3;
-  WheelControl(leftMotorPin, Speed, 1);
-  WheelControl(rightMotorPin, Speed, 1);
+  //int Speed = MAIN_SPEED *3;
+  WheelControl(leftMotorPin, MAIN_SPEED, 1);
+  WheelControl(rightMotorPin, MAIN_SPEED, 1);
 }
 
 void SmoothTurn(int pin, int amount){
-  WheelControl(pin, MAIN_SPEED + amount);
-  
-  
+  WheelControl(pin, MAIN_SPEED + amount); //Makes one wheel turn faster than the other to course correct
 }
 
 void CornerTurn(int pin){
   Stop();
   delay(400);
-  WheelControl(rightMotorPin, MAIN_SPEED, 1);
+  WheelControl(rightMotorPin, MAIN_SPEED, 1); //Backs up the robot before making a turn
   WheelControl(leftMotorPin, MAIN_SPEED, 1);
-  delay(300);
-  Turn(pin, 2700, 30);
+  delay(250); //Determines how long the robot backs up for
+  Stop(); //Stop the robot and delay to avoid changing direction too quickly
+  delay(400);
+  Turn(pin, 525, MAIN_SPEED); //Determines how long and fast the robot turns on a corner, 2nd number needs to be changed depending on the speed
   GoForward();
-  delay(200);
+  delay(200); //Don't read data right after turning, go forward first for 200 ms
 }
   
 void Turn(int pin, int amount){ //pin = left or right motor pin, amount = time in ms
@@ -162,20 +160,6 @@ void Turn(int pin, int amount, int sp){ //pin = left or right motor pin, amount 
   WheelControl(pin, 0); //Stops the turning
 }
 
-void SharpTurn(int pin){
-  Stop();
-  WheelControl(pin, MAIN_SPEED);
-  if(pin == rightMotorPin){
-    pin = leftMotorPin;
-  }
-  else{
-    pin = rightMotorPin;
-  }
-  WheelControl(pin, MAIN_SPEED, 1);
-  delay(800); //FIXME FIND A TIME THAT RELATES TO THE CURRENT SPEED, 80 IS GOOD FOR SPEED = 50
-  Stop();
-}
-
 void Stop(){
   WheelControl(leftMotorPin, 0);
   WheelControl(rightMotorPin, 0);
@@ -185,7 +169,7 @@ void TurnAround(){
   Stop();
   WheelControl(leftMotorPin, MAIN_SPEED);
   WheelControl(rightMotorPin, MAIN_SPEED, 1);
-  delay(1750); //FIXME FIND A TIME THAT RELATES TO THE CURRENT SPEED, 1125 IS GOOD FOR SPEED = 50
+  delay(650); //FIXME IF MAIN_SPEED IS CHANGED ******************************** Needs to be changed
   Stop();
 }
 
@@ -195,19 +179,19 @@ void RespondToBlack(int data) {
   else if( data == 7000)
     CornerTurn(rightMotorPin);
   else if (data > 0 && data < 1000)
-    SmoothTurn(leftMotorPin, 50);
+    SmoothTurn(leftMotorPin, 25); //Find a value that works with the speed; Adds this amount to MAIN_SPEEd
   else if (data > 1000 && data < 2000)
-    SmoothTurn(leftMotorPin, 35);
+    SmoothTurn(leftMotorPin, 14); //Find a value that works with the speed
   else if (data > 2000 && data < 3000)
-    SmoothTurn(leftMotorPin, 25);
+    SmoothTurn(leftMotorPin, 7); //Find a value that works with the speed
   else if (data > 3000 && data < 4000)
     GoForward();
   else if (data > 4000 && data < 5000)
-    SmoothTurn(rightMotorPin, 25);
+    SmoothTurn(rightMotorPin, 7); //Find a value that works with the speed
   else if(data > 5000 && data < 6000)
-    SmoothTurn(rightMotorPin, 35);
+    SmoothTurn(rightMotorPin, 14); //Find a value that works with the speed
   else if(data > 6000)
-    SmoothTurn(rightMotorPin, 50);
+    SmoothTurn(rightMotorPin, 25); //Find a value that works with the speed
   
 }
 
@@ -229,27 +213,6 @@ void RespondToBlack2(int data) {
     GoForward();
 }
 
-void RespondToLine(int data, int count){
-  if(testMode == 1){
-    Serial.print("Count = ");
-    Serial.println(count);
-  }
-  if(data <= 0 && count == 5){
-    SharpTurn(leftMotorPin);
-  }
-  else if(data < 1000){
-    Turn(leftMotorPin, 400); //FIXME FIND A TIME THAT RELATES TO THE CURRENT SPEED
-  }
-  else if(data >= 3000 && count == 5){
-    SharpTurn(rightMotorPin);
-  }
-  else if(data > 2900){
-    Turn(rightMotorPin, 400); //FIXME FIND A TIME THAT RELATES TO THE CURRENT SPEED
-  }
-  else{
-    GoForward();
-  }
-}
 
 int CountLineData(int oldData, int data, int count){
   if(testMode == 1){
@@ -264,17 +227,6 @@ int CountLineData(int oldData, int data, int count){
   else{
     return 0;
   }
-}
-
-void MotorTest(){
-  GoForward();
-  delay(1000);
-  Stop();
-  delay(1000);
-  GoBackwards();
-  delay(1000);
-  Stop();
-  delay(1000);
 }
 
 void SetUpBumpers(){
@@ -321,10 +273,10 @@ void RespondToBump(){
     GoBackwards();
     delay(500);
     if(bump == 1){
-      Turn(rightMotorPin, 2000); //FIXME 575 is just a test number, should turn robot about 45degrees if speed = 50;
+      Turn(rightMotorPin, 2000); //FIXME 575 is just a test number, should turn robot about 45degrees if speed = 50; ******************************
     }
     else if (bump == 2){
-      Turn(leftMotorPin, 2000); //FIXME 575 is just a test number, should turn robot about 45degrees if speed = 50;
+      Turn(leftMotorPin, 2000); //FIXME 575 is just a test number, should turn robot about 45degrees if speed = 50; ********************************
     }
     else{
       TurnAround();
@@ -334,9 +286,7 @@ void RespondToBump(){
 
 void SetUpLine(){
   qtr.setTypeRC();
-  //qtr.setTypeAnalog();
   qtr.setSensorPins((const uint8_t[]){42, 43, 44, 45, 46, 47, 48, 49}, SensorCount);
-  //qtr.setSensorPins((const uint8_t[]){A0, A1, A2, A3}, SensorCount);
   //qtr.setEmitterPin(45);
 
   delay(500);
@@ -398,7 +348,7 @@ void RaiseArm(){
 void PickUpBall(){
   Stop();
   LowerArm();
-  //GoBackwards();   
+  //GoBackwards();   //Add back in if ball is stuck to the ground with tape
   delay(500);
   Stop();
   RaiseArm();
@@ -426,16 +376,12 @@ void SetUpDistanceSensor(){
 
 bool CheckBall(){
   bool foundBall = false;
-  
-  
 
   if (sensor.isSampleDone())
   {
     sensor.readOutputRegs();
     amplitudes[sensor.channelUsed] = sensor.amplitude;
     distances[sensor.channelUsed] = sensor.distanceMillimeters;
-
-   
 
     if (sensor.channelUsed == 2 && testMode == 1)
     {
@@ -448,6 +394,7 @@ bool CheckBall(){
       }
       Serial.println();
     }
+    //Uses 3 input values from the distance sensor
    /* if(distances[0] > 150 && distances[0] < 200 && distances[1] > 100 && distances[1] < 160 && distances[2] > 120 && distances[2] < 200 && sr04.Distance() > 5){
       foundBall = true;
       if(testMode == 1){
@@ -455,7 +402,13 @@ bool CheckBall(){
       }
     }
     */
-    Serial.println(sr04.Distance());
+    if(testMode == 1){
+      Serial.print("Top ultrasonic sensor value = ");
+      Serial.println(sr04.Distance());
+      Serial.print("Bottom IR single value = ");
+      Serial.println(sensor.distanceMillimeters);
+    }
+    
    
    // if((sensor.distanceMillimeters > 35 && sensor.distanceMillimeters < 115) && sr04.Distance() > 10)
    //   foundBall = true;
