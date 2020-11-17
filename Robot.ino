@@ -1,6 +1,6 @@
 int testMode = 1;
 //Xan test one
-const int MAIN_SPEED = 30;
+const int MAIN_SPEED = 150;
 
 //Defines motor pin locations
 int leftMotorPin = 2;
@@ -65,7 +65,7 @@ void loop() {
   
   tempData = ReadLine();
   Serial.println(tempData);
-  RespondToBlack2(tempData);
+  RespondToBlack(tempData);
 
   RespondToBump();
   
@@ -138,10 +138,11 @@ void SmoothTurn(int pin, int amount){
 
 void CornerTurn(int pin){
   Stop();
+  delay(400);
   WheelControl(rightMotorPin, MAIN_SPEED, 1);
   WheelControl(leftMotorPin, MAIN_SPEED, 1);
-  delay(700);
-  Turn(pin, 2400);
+  delay(300);
+  Turn(pin, 2700, 30);
   GoForward();
   delay(200);
 }
@@ -149,6 +150,13 @@ void CornerTurn(int pin){
 void Turn(int pin, int amount){ //pin = left or right motor pin, amount = time in ms
   Stop();
   int Speed = MAIN_SPEED;
+  WheelControl(pin, Speed);
+  delay(amount);
+  WheelControl(pin, 0); //Stops the turning
+}
+void Turn(int pin, int amount, int sp){ //pin = left or right motor pin, amount = time in ms
+  Stop();
+  int Speed = sp;
   WheelControl(pin, Speed);
   delay(amount);
   WheelControl(pin, 0); //Stops the turning
@@ -187,19 +195,19 @@ void RespondToBlack(int data) {
   else if( data == 7000)
     CornerTurn(rightMotorPin);
   else if (data > 0 && data < 1000)
-    SmoothTurn(leftMotorPin, 11);
+    SmoothTurn(leftMotorPin, 50);
   else if (data > 1000 && data < 2000)
-    SmoothTurn(leftMotorPin,6);
+    SmoothTurn(leftMotorPin, 35);
   else if (data > 2000 && data < 3000)
-    SmoothTurn(leftMotorPin, 3);
+    SmoothTurn(leftMotorPin, 25);
   else if (data > 3000 && data < 4000)
     GoForward();
   else if (data > 4000 && data < 5000)
-    SmoothTurn(rightMotorPin, 3);
+    SmoothTurn(rightMotorPin, 25);
   else if(data > 5000 && data < 6000)
-    SmoothTurn(rightMotorPin,6);
+    SmoothTurn(rightMotorPin, 35);
   else if(data > 6000)
-    SmoothTurn(rightMotorPin, 11);
+    SmoothTurn(rightMotorPin, 50);
   
 }
 
@@ -372,14 +380,16 @@ int ReadLine(){
 }
 
 void LowerArm(){
-  for (int i = 0; i < 750; i++){
+  arm.setSpeed(400);
+  for (int i = 0; i < 1100; i++){
     arm.step(1);
     delay(5);
   }
 }
 
 void RaiseArm(){
-  for (int i = 0; i < 750; i++){
+  arm.setSpeed(200);
+  for (int i = 0; i < 1000; i++){
     arm.step(-1);
     delay(5);
   }
@@ -388,7 +398,7 @@ void RaiseArm(){
 void PickUpBall(){
   Stop();
   LowerArm();
-  GoBackwards();   
+  //GoBackwards();   
   delay(500);
   Stop();
   RaiseArm();
@@ -416,11 +426,16 @@ void SetUpDistanceSensor(){
 
 bool CheckBall(){
   bool foundBall = false;
+  
+  
+
   if (sensor.isSampleDone())
   {
     sensor.readOutputRegs();
     amplitudes[sensor.channelUsed] = sensor.amplitude;
     distances[sensor.channelUsed] = sensor.distanceMillimeters;
+
+   
 
     if (sensor.channelUsed == 2 && testMode == 1)
     {
@@ -428,17 +443,26 @@ bool CheckBall(){
       {
         Serial.print(distances[i]);
         Serial.print(", ");
+        Serial.print(amplitudes[i]);
+        Serial.print(',');
       }
       Serial.println();
     }
-    if(distances[0] > 150 && distances[0] < 200 && distances[1] > 100 && distances[1] < 160 && distances[2] > 120 && distances[2] < 200 && sr04.Distance() > 18){
+   /* if(distances[0] > 150 && distances[0] < 200 && distances[1] > 100 && distances[1] < 160 && distances[2] > 120 && distances[2] < 200 && sr04.Distance() > 5){
       foundBall = true;
       if(testMode == 1){
         Serial.println("Ball found, lowering arm");
       }
     }
+    */
+    Serial.println(sr04.Distance());
+   
+   // if((sensor.distanceMillimeters > 35 && sensor.distanceMillimeters < 115) && sr04.Distance() > 10)
+   //   foundBall = true;
     sensor.nextChannel();
     sensor.startSample();
+  
+  
+   return foundBall;
   }
-  return foundBall;
 }
