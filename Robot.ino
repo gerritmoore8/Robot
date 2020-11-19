@@ -31,6 +31,14 @@ uint16_t sensorValues[SensorCount];
 const int stepsPerRevolution = 100; //Try 200, change to see what fits with this motor
 Stepper arm(stepsPerRevolution, 25,24,23,22); //Stepper motor pins, start with 1N4 and go down
 
+//Everything for the distance sensor
+#include <OPT3101.h>
+#include <Wire.h>
+OPT3101 sensor;
+uint16_t amplitudes[3];
+int16_t distances[3];
+void SetUpDistanceSensor();
+
 //Defines pins for IR distance sensor
 int topPin = A0;
 int bottomPin = A1;
@@ -39,6 +47,10 @@ void SetUpIr(){
   pinMode(topPin, INPUT);
   pinMode(bottomPin, INPUT);
 }
+
+//Everything for the ultrasonic sensor
+#include "SR04.h"
+SR04 sr04 = SR04(35,34); //(EchoPin, TriggerPin);
 
 
 void setup() {
@@ -354,4 +366,64 @@ bool CheckBall(){
     foundBall = true;
   }
   return foundBall;
+}
+
+void SetUpDistanceSensor(){
+  Wire.begin();
+  sensor.init();
+  if (sensor.getLastError())
+  {
+    Serial.print(F("Failed to initialize OPT3101: error "));
+    Serial.println(sensor.getLastError());
+    while (1) {}
+  }
+
+  sensor.setFrameTiming(256);
+  sensor.setChannel(0);
+  sensor.setBrightness(OPT3101Brightness::Adaptive);
+
+  sensor.startSample();
+}
+
+bool CheckBall(){
+  bool foundBall = false;
+  
+  
+
+  if (sensor.isSampleDone())
+  {
+    sensor.readOutputRegs();
+    amplitudes[sensor.channelUsed] = sensor.amplitude;
+    distances[sensor.channelUsed] = sensor.distanceMillimeters;
+
+   
+
+    if (sensor.channelUsed == 2 && testMode == 1)
+    {
+      for (uint8_t i = 0; i < 3; i++)
+      {
+        Serial.print(distances[i]);
+        Serial.print(", ");
+        Serial.print(amplitudes[i]);
+        Serial.print(',');
+      }
+      Serial.println();
+    }
+   /* if(distances[0] > 150 && distances[0] < 200 && distances[1] > 100 && distances[1] < 160 && distances[2] > 120 && distances[2] < 200 && sr04.Distance() > 5){
+      foundBall = true;
+      if(testMode == 1){
+        Serial.println("Ball found, lowering arm");
+      }
+    }
+    */
+    Serial.println(sr04.Distance());
+   
+   // if((sensor.distanceMillimeters > 35 && sensor.distanceMillimeters < 115) && sr04.Distance() > 10)
+   //   foundBall = true;
+    sensor.nextChannel();
+    sensor.startSample();
+  
+  
+   return foundBall;
+  }
 }
