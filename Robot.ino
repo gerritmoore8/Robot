@@ -1,5 +1,5 @@
 int testMode = 0;
-//Xan test one
+
 const int MAIN_SPEED = 100;
 
 //Defines motor pin locations
@@ -12,7 +12,7 @@ int rightMotorDir = 53;
 void SetUpWheels();
 void WheelControl(int pin, int Speed, int dir = 0);
 void GoForward();
-void GoBackwards();
+void GoBackwards(int sp = MAIN_SPEED);
 void Stop();
 void MotorTest();
 
@@ -31,18 +31,14 @@ uint16_t sensorValues[SensorCount];
 const int stepsPerRevolution = 100; //Try 200, change to see what fits with this motor
 Stepper arm(stepsPerRevolution, 25,24,23,22); //Stepper motor pins, start with 1N4 and go down
 
-//Everything for the distance sensor
-#include <OPT3101.h>
-#include <Wire.h>
-OPT3101 sensor;
-uint16_t amplitudes[3];
-int16_t distances[3];
-void SetUpDistanceSensor();
+//Defines pins for IR distance sensor
+int topPin = A0;
+int bottomPin = A1;
 
-//Everything for the ultrasonic sensor
-#include "SR04.h"
-SR04 sr04 = SR04(35,34);
-SR04 bottom = SR04(32,33); 
+void SetUpIr(){
+  pinMode(topPin, INPUT);
+  pinMode(bottomPin, INPUT);
+}
 
 
 void setup() {
@@ -52,27 +48,19 @@ void setup() {
   SetUpWheels();
   SetUpBumpers();
   arm.setSpeed(200); //in RPM
-  //SetUpDistanceSensor();
   SetUpLine();
+  SetUpIr();
 }
 
 void loop() { 
-  static int tempData = 0;
-  static bool gotBall = false;
-  static int topVal = 0;
-  static int bottomVal = 0;
+  static bool gotBall = false; 
 
-  topVal = ReadTop();
-  bottomVal = ReadBottom();
-  
-  tempData = ReadLine();
-  Serial.println(tempData);
-  RespondToBlack(tempData);
+  RespondToBlack(ReadLine());
 
-  RespondToBump();
+  //RespondToBump();  
   
-  if(CheckBall(bottomVal, topVal) && !gotBall){
-    GoBackwards();
+  if(CheckBall() && !gotBall){
+    GoBackwards(MAIN_SPEED/2);
     delay(400);
     PickUpBall();
     delay(1000);
@@ -127,11 +115,11 @@ void GoForward(){
   WheelControl(rightMotorPin, MAIN_SPEED); //Extra value is to compensate for weight of motor on right side
 }
 
-void GoBackwards(){
+void GoBackwards(int sp = MAIN_SPEED){
   Stop();
   //int Speed = MAIN_SPEED *3;
-  WheelControl(leftMotorPin, MAIN_SPEED, 1);
-  WheelControl(rightMotorPin, MAIN_SPEED, 1);
+  WheelControl(leftMotorPin, sp, 1);
+  WheelControl(rightMotorPin, sp, 1);
 }
 
 void SmoothTurn(int pin, int amount){
@@ -143,7 +131,7 @@ void CornerTurn(int pin){
   delay(400);
   WheelControl(rightMotorPin, MAIN_SPEED, 1); //Backs up the robot before making a turn
   WheelControl(leftMotorPin, MAIN_SPEED, 1);
-  delay(315); //Determines how long the robot backs up for
+  delay(260); //Determines how long the robot backs up for
   Stop(); //Stop the robot and delay to avoid changing direction too quickly
   delay(400);
   Turn(pin, 560, MAIN_SPEED); //Determines how long and fast the robot turns on a corner, 2nd number needs to be changed depending on the speed
@@ -184,20 +172,26 @@ void RespondToBlack(int data) {
     CornerTurn(leftMotorPin);
   else if( data == 7000)
     CornerTurn(rightMotorPin);
-  else if (data > 0 && data < 1000)
-    SmoothTurn(leftMotorPin, 22); //Find a value that works with the speed; Adds this amount to MAIN_SPEED
-  else if (data > 1000 && data < 2000)
+  else if (data > 0 && data < 1000) {
+    SmoothTurn(leftMotorPin, 30); //Find a value that works with the speed; Adds this amount to MAIN_SPEED
+    SmoothTurn(rightMotorPin, 0); }
+  else if (data > 1000 && data < 2000) {
     SmoothTurn(leftMotorPin, 14); //Find a value that works with the speed
-  else if (data > 2000 && data < 3000)
+    SmoothTurn(rightMotorPin, 0); }
+  else if (data > 2000 && data < 3000) {
     SmoothTurn(leftMotorPin, 7); //Find a value that works with the speed
+    SmoothTurn(rightMotorPin, 0); }
   else if (data > 3000 && data < 4000)
     GoForward();
-  else if (data > 4000 && data < 5000)
+  else if (data > 4000 && data < 5000) {
     SmoothTurn(rightMotorPin, 7); //Find a value that works with the speed
-  else if(data > 5000 && data < 6000)
+    SmoothTurn(leftMotorPin, 0); }
+  else if(data > 5000 && data < 6000) {
     SmoothTurn(rightMotorPin, 14); //Find a value that works with the speed
-  else if(data > 6000)
-    SmoothTurn(rightMotorPin, 24); //Find a value that works with the speed
+    SmoothTurn(leftMotorPin, 0); }
+  else if(data > 6000) {
+    SmoothTurn(rightMotorPin, 30); //Find a value that works with the speed
+    SmoothTurn(leftMotorPin, 0); }
   
 }
 
@@ -260,7 +254,7 @@ void RespondToBump(){
     return;
   }
   else{
-    GoBackwards();
+    GoBackwards(MAIN_SPEED/2);
     delay(400);
     if(bump == 1){
       Turn(rightMotorPin, 275, MAIN_SPEED + 30); //Needs to be changed in main_speed is changed
@@ -347,98 +341,17 @@ void PickUpBall(){
   }
 }
 
-void SetUpDistanceSensor(){
-  Wire.begin();
-  sensor.init();
-  if (sensor.getLastError())
-  {
-    Serial.print(F("Failed to initialize OPT3101: error "));
-    Serial.println(sensor.getLastError());
-    while (1) {}
-  }
-
-  sensor.setFrameTiming(256);
-  sensor.setChannel(0);
-  sensor.setBrightness(OPT3101Brightness::Adaptive);
-
-  sensor.startSample();
-}
-
-int ReadTop(){
-  return sr04.Distance();
-}
-
-int ReadBottom(){
-  return bottom.Distance();
-}
-
-bool CheckBall(int bottomVal, int topVal){
+bool CheckBall(){
   bool foundBall = false;
- 
-  
   if(testMode == 1){
-      Serial.print("Top ultrasonic sensor value = ");
-      Serial.println(sr04.Distance());
-      Serial.print("Bottom IR single value = ");
-      Serial.println(bottom.Distance());
-    }
-   
-  if( bottomVal > 25 && topVal < 15){
+    Serial.print("Top = ");
+    Serial.println(analogRead(topPin));
+
+    Serial.print("Bottom = ");
+    Serial.println(analogRead(bottomPin));
+  }
+  if((analogRead(topPin) < 10) && (analogRead(bottomPin) > 20)){
     foundBall = true;
-    if(testMode == 1){
-      Serial.println("Ball found");
-    }
   }
   return foundBall;
 }
-
-
-
-
-/*
-
-bool CheckBall(){
-  bool foundBall = false;
-
-  if (sensor.isSampleDone())
-  {
-    sensor.readOutputRegs();
-    amplitudes[sensor.channelUsed] = sensor.amplitude;
-    distances[sensor.channelUsed] = sensor.distanceMillimeters;
-
-    if (sensor.channelUsed == 2 && testMode == 1)
-    {
-      for (uint8_t i = 0; i < 3; i++)
-      {
-        Serial.print(distances[i]);
-        Serial.print(", ");
-        Serial.print(amplitudes[i]);
-        Serial.print(',');
-      }
-      Serial.println();
-    }
-    //Uses 3 input values from the distance sensor
-   /* if(distances[0] > 150 && distances[0] < 200 && distances[1] > 100 && distances[1] < 160 && distances[2] > 120 && distances[2] < 200 && sr04.Distance() > 5){
-      foundBall = true;
-      if(testMode == 1){
-        Serial.println("Ball found, lowering arm");
-      }
-    }
-    
-    if(testMode == 1){
-      Serial.print("Top ultrasonic sensor value = ");
-      Serial.println(sr04.Distance());
-      Serial.print("Bottom IR single value = ");
-      Serial.println(sensor.distanceMillimeters);
-    }
-    
-   
-   // if((sensor.distanceMillimeters > 35 && sensor.distanceMillimeters < 115) && sr04.Distance() > 10)
-   //   foundBall = true;
-    sensor.nextChannel();
-    sensor.startSample();
-  
-  
-   return foundBall;
-  }
-}*/
